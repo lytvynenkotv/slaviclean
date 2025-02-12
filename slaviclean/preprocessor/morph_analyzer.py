@@ -14,17 +14,19 @@ class MorphAnalyzer:
         self._morph = {}
 
         if preload:
-            self._load_model('uk')
-            self._load_model('ru')
+            self.preload_model('uk')
+            self.preload_model('ru')
 
-    def _load_model(self, lang: str):
+    def preload_model(self, lang: str):
+        if lang == 'surzhyk':
+            lang = 'uk'
         self._morph[lang] = pymorphy3.MorphAnalyzer(lang=lang)
 
     def _parse(self, token: str, lang: str):
         if lang == 'surzhyk':
             lang = 'uk'
         if lang not in self._morph:
-            self._load_model(lang)
+            self.preload_model(lang)
         return self._morph[lang].parse(token) or []
 
     def collect_morph_forms(self, token: str, lang: str) -> Set[str]:

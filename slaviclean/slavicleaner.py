@@ -1,4 +1,4 @@
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict, Set, Tuple, Optional
 import logging
 from enum import Enum
 
@@ -43,7 +43,10 @@ class SlaviCleaner:
     _morph: MorphAnalyzer = None
 
     def __init__(self, preload: bool = False, keyboards: List[str] = None):
-        self._morph = MorphAnalyzer(preload=preload)
+        self._morph = MorphAnalyzer()
+        self._vocab = {}
+        self._nlp = {}
+
         if preload:
             self.preload_models(keyboards=keyboards)
 
@@ -135,7 +138,6 @@ class SlaviCleaner:
                         is_profanity = True
                         break
 
-
             if token_idx2profanity.get(token.i):
 
                 for i_token in self._get_token_subtree(token, min_subtree_size=min_subtree_size):
@@ -218,11 +220,17 @@ class SlaviCleaner:
         if lang not in available_languages:
             raise ValueError(f"Unsupported language: {lang}. Only {available_languages} are supported.")
 
-    def preload_models(self, keyboards: List[str]):
-        self._vocab = {}
+    def preload_models(self, lang: Optional[str] = None, keyboards: Optional[List[str]] = None):
+        if lang:
+            self._vocab[lang] = build_profanity_dict(lang=lang, keyboards=keyboards)
+            self._load_parser(lang)
+            self._morph.preload_model(lang)
+            return
+
         for lang in self.get_available_languages():
             self._vocab[lang] = build_profanity_dict(lang=lang, keyboards=keyboards)
             self._load_parser(lang)
+            self._morph.preload_model(lang)
 
     def _parse(self, message: str, lang: str):
         if lang == 'surzhyk':
