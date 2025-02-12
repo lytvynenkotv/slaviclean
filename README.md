@@ -1,7 +1,7 @@
 # slaviclean
 
 [![Python Versions](https://img.shields.io/badge/Python%20Versions-%3E%3D3.11-informational)](https://pypi.org/project/nlp-flexi-tools/)
-[![Version](https://img.shields.io/badge/Version-0.0.1-informational)](https://pypi.org/project/nlp-flexi-tools/)
+[![Version](https://img.shields.io/badge/Version-0.0.2-informational)](https://pypi.org/project/nlp-flexi-tools/)
 
 
 **SlaviCleaner** is a profanity filtering library designed for cleaning text from offensive language, specifically tailored for Ukrainian and Russian languages. 
