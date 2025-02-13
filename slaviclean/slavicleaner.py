@@ -1,6 +1,7 @@
 from typing import List, Dict, Set, Tuple, Optional
 import logging
 from enum import Enum
+from concurrent.futures import ThreadPoolExecutor
 
 import spacy
 from spacy.util import is_package
@@ -95,49 +96,20 @@ class SlaviCleaner:
         self._check_language(lang)
 
         doc = self._parse(message, lang)
-        token_idx2profanity: Dict[int, Profanity] = {}
+
+        def __process_token(token):
+            return token.i, self._check_token(token, lang, analyze_morph)
+
+        with ThreadPoolExecutor() as executor:
+            results = executor.map(__process_token, doc)
+
+        token_idx2profanity = dict(results)
 
         for token in doc:
+            _profanity = self._check_token(token, lang, analyze_morph)
+            token_idx2profanity[token.i] = _profanity
 
-            if token.pos_ in ('PUNCT', 'CCONJ', 'SCONJ', 'PART', 'DET', 'ADP'):
-                continue
-
-            if token_idx2profanity.get(token.i):
-                continue
-
-            logger.debug(f'start checking "{token.orth_}" {token.pos_}')
-
-            is_profanity = False
-            if self._is_masked_profanity(token.orth_):
-                logger.debug(f'\t- detected masked')
-                token_idx2profanity[token.i] = Profanity(
-                    span=(token.idx, token.idx + len(token.orth_)),
-                    nearest=token.orth_,
-                    tags=[ProfanityRelationType.MASKED.value, ])
-                if_profanity = True
-
-            if not is_profanity:
-                candidates = deobfuscate_token(token.orth_, lang)
-                for candidate in candidates:
-                    profanity = self._is_known_profanity(candidate, span=(token.idx, token.idx + len(token.orth_)), lang=lang)
-                    if profanity is None:
-                        continue
-                    token_idx2profanity[token.i] = profanity
-                    is_profanity = True
-                    break
-
-                if not is_profanity and analyze_morph:
-
-                    morph_forms = set().union(*[self._morph.collect_morph_forms(candidate, lang) for candidate in candidates])
-
-                    for candidate in morph_forms:
-                        profanity = self._is_known_profanity(candidate, span=(token.idx, token.idx + len(token.orth_)), lang=lang)
-                        if profanity is None:
-                            continue
-                        token_idx2profanity[token.i] = profanity
-                        is_profanity = True
-                        break
-
+        for token in doc:
             if token_idx2profanity.get(token.i):
 
                 for i_token in self._get_token_subtree(token, min_subtree_size=min_subtree_size):
@@ -148,7 +120,36 @@ class SlaviCleaner:
                         nearest=token_idx2profanity[token.i].nearest,
                         tags=token_idx2profanity[token.i].tags + [ProfanityRelationType.SUBTREE.value, ])
 
-        return list(token_idx2profanity.values())
+        return [x for x in token_idx2profanity.values() if x is not None]
+
+    def _check_token(self, token, lang, analyze_morph):
+        if token.pos_ in ('PUNCT', 'CCONJ', 'SCONJ', 'PART', 'DET', 'ADP'):
+            return None
+
+        if self._is_masked_profanity(token.orth_):
+            logger.debug(f'\t- detected masked')
+            return Profanity(
+                span=(token.idx, token.idx + len(token.orth_)),
+                nearest=token.orth_,
+                tags=[ProfanityRelationType.MASKED.value, ])
+
+
+        candidates = deobfuscate_token(token.orth_, lang)
+        for candidate in candidates:
+            profanity = self._is_known_profanity(candidate, span=(token.idx, token.idx + len(token.orth_)), lang=lang)
+            if profanity is None:
+                continue
+            return profanity
+
+        if analyze_morph:
+
+            morph_forms = set().union(*[self._morph.collect_morph_forms(candidate, lang) for candidate in candidates])
+
+            for candidate in morph_forms:
+                profanity = self._is_known_profanity(candidate, span=(token.idx, token.idx + len(token.orth_)), lang=lang)
+                if profanity is None:
+                    continue
+                return profanity
 
     @staticmethod
     def _get_token_subtree(token: spacy.tokens.Token, min_subtree_size: float) -> List[int]:
