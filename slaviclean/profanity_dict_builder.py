@@ -1,52 +1,14 @@
-from typing import List
-from itertools import chain
-
 import pandas as pd
-
-from flexi_nlp_tools.flexi_dict import FlexiDict
-from flexi_nlp_tools.flexi_dict.search_engine import SearchEngine
-from flexi_nlp_tools.flexi_dict.utils import calculate_symbols_distances, calculate_symbols_weights
 
 from .config import PROFANITY_FILTER_DATA_PATH
 
 
-def build_profanity_dict(lang: str, keyboards: List[str] = None):
-    """Builds a profanity dictionary for a given language.
-
-    Args:
-        lang (str): The target language ('uk', 'ru', or 'surzhyk').
-        keyboards (List[str], optional): Keyboard layouts to consider for symbol distance calculations. Defaults to None.
-
-    Returns:
-        FlexiDict: A dictionary with profane words and their types.
-    """
+def build_profanity_dict(lang: str):
     df = _read_dataset(lang)
-
-    # Calculating symbol weights
-    corpus = [flexion.strip().lower() for flexion in df['flexion'].values]
-    symbols_weights = calculate_symbols_weights(corpus)
-
-    # Calculating symbol distances
-    symbols_distances = calculate_symbols_distances(symbol_keyboards=keyboards) if keyboards else None
-
-    search_engine = SearchEngine(symbols_distances=symbols_distances, symbol_weights=symbols_weights)
-    profanity_dict = FlexiDict(search_engine=search_engine)
-
-    for (flexion, lemma), sub in df.groupby(by=['flexion', 'lemma']):
-        flexion = flexion.strip().lower()
-
-        if not flexion:
-            continue
-
-        profanity_types = ' '.join([
-            x.strip()
-            for x in set(chain(*[
-                row.split(' ') for row in sub.profanityTypes.values
-            ])) if x.strip()])
-
-        profanity_dict[flexion] = profanity_types
-
-    return profanity_dict
+    return {
+        row.flexion.strip().lower(): row.profanityTypes
+        for i, row in df.drop_duplicates(subset=['flexion', ]).iterrows()
+    }
 
 
 def _read_dataset(lang: str):

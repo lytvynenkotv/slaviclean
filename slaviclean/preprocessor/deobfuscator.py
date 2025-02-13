@@ -80,12 +80,13 @@ def deobfuscate_token(token: str, lang: str) -> Set[str]:
 
         if patterns.IS_CYRILLIC_TOKEN_PATTERN.match(token_fixed_look_alike.upper()):
             deobfuscated.add(token_fixed_look_alike.lower())
+        else:
+            token_translit = en2uk_translit(token_fixed_look_alike)
+            deobfuscated.add(token_translit.lower())
 
-        token_translit = en2uk_translit(token)
-        deobfuscated.add(token_translit.lower())
-
-        token_translit = en2uk_translit(token_fixed_look_alike)
-        deobfuscated.add(token_translit.lower())
+        if patterns.IS_LATIN_TOKEN_PATTERN.match(token.upper()):
+            token_translit = en2uk_translit(token)
+            deobfuscated.add(token_translit.lower())
     else:
         token_fixed_look_alike = patterns.LAT_INNER_LOOK_ALIKE_CYR_CHARS_PATTERN.sub(__replace_lat_inner_look_alike_match, token)
         deobfuscated.add(token_fixed_look_alike.lower())

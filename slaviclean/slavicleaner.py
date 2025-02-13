@@ -43,13 +43,13 @@ class SlaviCleaner:
     _vocab: Dict[str, FlexiDict] = None
     _morph: MorphAnalyzer = None
 
-    def __init__(self, preload: bool = False, keyboards: List[str] = None):
+    def __init__(self, preload: bool = False):
         self._morph = MorphAnalyzer()
         self._vocab = {}
         self._nlp = {}
 
         if preload:
-            self.preload_models(keyboards=keyboards)
+            self.preload_models()
 
     def sanitize(
             self,
@@ -133,7 +133,6 @@ class SlaviCleaner:
                 nearest=token.orth_,
                 tags=[ProfanityRelationType.MASKED.value, ])
 
-
         candidates = deobfuscate_token(token.orth_, lang)
         for candidate in candidates:
             profanity = self._is_known_profanity(candidate, span=(token.idx, token.idx + len(token.orth_)), lang=lang)
@@ -170,24 +169,13 @@ class SlaviCleaner:
         return patterns.MASKED_OBSCENE_PATTERNS['*'].match(token) is not None
 
     def _is_known_profanity(self, token: str, span: Tuple[int, int], lang: str):
-        profanity_candidates = self._search_internal(token.lower(), lang)
-        if not profanity_candidates:
-            return None
-        
-        profanity_candidate = profanity_candidates[0]
-        similarity = .75 - profanity_candidate.total_corrections_price
-        if similarity <= 0:
-            return None
-        
-        profanity_candidate_types = sorted(
-            profanity_candidate.value.split(' '),
-            key=lambda x: TAG_LEVEL_MAP[x]
-        )
-        return Profanity(
-            span=span,
-            nearest=profanity_candidate.path,
-            tags=profanity_candidate_types)
-    
+        profanity_candidate_types = self._search_in_dict(token.lower(), lang)
+        if profanity_candidate_types:
+            return Profanity(
+                span=span,
+                nearest=token,
+                tags=profanity_candidate_types.split(' '))
+
     def _load_parser(self, lang: str):
 
         if lang == 'surzhyk':
@@ -207,7 +195,7 @@ class SlaviCleaner:
                 logger.info(f'Model for language {lang} downloaded successfully.')
 
             logger.info(f'Loading spaCy model for language: {lang}')
-            self._nlp[lang] = spacy.load(_SPACY_MODELS[lang])
+            self._nlp[lang] = spacy.load(_SPACY_MODELS[lang], disable=['lemmatizer'])
             logger.info(f'Model for language {lang} loaded successfully.')
 
         return self._nlp[lang]
@@ -221,15 +209,15 @@ class SlaviCleaner:
         if lang not in available_languages:
             raise ValueError(f"Unsupported language: {lang}. Only {available_languages} are supported.")
 
-    def preload_models(self, lang: Optional[str] = None, keyboards: Optional[List[str]] = None):
+    def preload_models(self, lang: Optional[str] = None):
         if lang:
-            self._vocab[lang] = build_profanity_dict(lang=lang, keyboards=keyboards)
+            self._vocab[lang] = build_profanity_dict(lang=lang)
             self._load_parser(lang)
             self._morph.preload_model(lang)
             return
 
         for lang in self.get_available_languages():
-            self._vocab[lang] = build_profanity_dict(lang=lang, keyboards=keyboards)
+            self._vocab[lang] = build_profanity_dict(lang=lang)
             self._load_parser(lang)
             self._morph.preload_model(lang)
 
@@ -240,13 +228,5 @@ class SlaviCleaner:
             self._load_parser(lang)
         return self._nlp[lang](message)
 
-    def _search_internal(self, token: str, lang: str):
-
-        if not self._vocab:
-            self._vocab = {}
-
-        if lang not in self._vocab:
-            self._vocab[lang] = build_profanity_dict(lang)
-
-        return self._vocab[lang].search_internal(token)
-
+    def _search_in_dict(self, token: str, lang: str):
+        return self._vocab[lang].get(token)
