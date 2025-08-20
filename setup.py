@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="slaviclean",
-    version="0.0.6",
+    version="0.1.0",
     description="Text filter designed to cleanse text of profanity and offensive language, specifically tailored for Ukrainian, Russian, and Surzhik.",
     author="Tetiana Lytvynenko",
     author_email="lytvynenkotv@gmail.com",
@@ -18,13 +18,13 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "flexi_nlp_tools>=0.5.5, <0.6",
+        "flexi_nlp_tools>=0.6.0, <0.7",
         "pandas>=2.2.3,<2.3",
         "spacy>=3.8.4, <3.9",
         "pymorphy3>=2.0, <2.1",
         "pymorphy3-dicts-uk>=2.4, <2.5"
     ],
-    python_requires=">=3.11",
+    python_requires=">=3.10",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
